@@ -165,13 +165,13 @@ def parse_status(homework: dict[str, Any]) -> str:
             raise KeyError(message)
 
     status = homework['status']
-    homework_name = homework['homework_name']
 
     if status not in HOMEWORK_VERDICTS:
         message = f'Статус {status} не предусмотрен!'
         logger.error(message)
         raise InvalidHomeworkStatusError(message)
 
+    homework_name = homework['homework_name']
     verdict = HOMEWORK_VERDICTS[status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
