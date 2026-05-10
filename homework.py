@@ -213,46 +213,44 @@ def main():
 
     last_error_type = None
 
-    try:
-        while True:
-            try:
-                response = get_api_answer(timestamp)
-                homeworks = check_response(response)
+    while True:
+        try:
+            response = get_api_answer(timestamp)
+            homeworks = check_response(response)
 
-                should_update_timestamp = False
+            should_update_timestamp = False
 
-                if not homeworks:
-                    logger.debug('Нет новых статусов домашек!')
-                    should_update_timestamp = True
-                else:
-                    homework = homeworks[0]
-                    message = parse_status(homework)
-                    should_update_timestamp = send_message(bot, message)
+            if not homeworks:
+                logger.debug('Нет новых статусов домашек!')
+                should_update_timestamp = True
+            else:
+                homework = homeworks[0]
+                message = parse_status(homework)
+                should_update_timestamp = send_message(bot, message)
 
-                if should_update_timestamp:
-                    timestamp = response.get('current_date', timestamp)
+            if should_update_timestamp:
+                timestamp = response.get('current_date', timestamp)
 
-                last_error_type = None
+            last_error_type = None
 
-            except Exception as error:
-                error_type = type(error)
-                message = f'Сбой в работе программы: {error}'
-                logger.error(message)
+        except Exception as error:
+            error_type = type(error)
+            message = f'Сбой в работе программы: {error}'
+            logger.error(message)
 
-                if error_type != last_error_type:
-                    send_message(bot, message)
-                    last_error_type = error_type
+            if error_type != last_error_type:
+                send_message(bot, message)
+                last_error_type = error_type
 
-            finally:
-                time.sleep(RETRY_PERIOD)
-
-    except KeyboardInterrupt:
-        logger.info('Бот остановлен вручную')
+        finally:
+            time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
     try:
         main()
+    except KeyboardInterrupt:
+        logger.info('Бот остановлен вручную')
     except Exception as error:
         logger.critical('Критическая ошибка: %s', error)
         sys.exit()
