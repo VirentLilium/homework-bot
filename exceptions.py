@@ -1,6 +1,10 @@
 """Модуль с исключениями."""
 
 
+class MissingEnvironmentVariableError(Exception):
+    """Отсутствуют обязательные переменные окружения."""
+
+
 class APIRequestError(Exception):
     """Ошибка запроса к API."""
 
