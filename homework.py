@@ -1,3 +1,5 @@
+"""Telegram-бот для проверки статуса домашних работ."""
+
 from http import HTTPStatus
 import logging
 import os
@@ -10,23 +12,23 @@ from dotenv import load_dotenv
 from telebot import TeleBot, apihelper
 
 from exceptions import (
-    APIRequestError, APIResponseError, InvalidHomeworkStatusError,
-    MissingEnvironmentVariableError
+    APIRequestError,
+    APIResponseError,
+    InvalidHomeworkStatusError,
+    MissingEnvironmentVariableError,
 )
 
 
 load_dotenv()
 
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-PRACTICUM_TOKEN = os.getenv("PRACTICUM_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
 RETRY_PERIOD = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
-
 
 HOMEWORK_VERDICTS = {
     'approved': 'Работа проверена: ревьюеру всё понравилось. Ура!',
@@ -40,22 +42,17 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 handler = logging.StreamHandler(stream=sys.stdout)
-
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-
 handler.setFormatter(formatter)
-
 logger.addHandler(handler)
 
 
 def check_tokens() -> None:
     """
-    Проверяет доступность переменных окружения.
+    Проверяет наличие обязательных переменных окружения.
 
-    Если отсутствует хотя бы одна переменная окружения — лог CRITICAL.
-
-    Исключения:
-        MissingEnvironmentVariableError
+    :raises MissingEnvironmentVariableError: Если отсутствует хотя бы
+        одна обязательная переменная окружения.
     """
     env_vars = {
         'TELEGRAM_TOKEN': TELEGRAM_TOKEN,
@@ -63,9 +60,13 @@ def check_tokens() -> None:
         'TELEGRAM_CHAT_ID': TELEGRAM_CHAT_ID,
     }
 
-    if not all(env_vars.values()):
-        missing = [name for name, value in env_vars.items() if not value]
-        message = (f'Отсутствуют переменные окружения: {missing}')
+    missing_vars = [
+        name for name, value in env_vars.items()
+        if not value
+    ]
+
+    if missing_vars:
+        message = (f'Отсутствуют переменные окружения: {missing_vars}')
         logger.critical(message)
         raise MissingEnvironmentVariableError(message)
 
@@ -74,15 +75,9 @@ def send_message(bot: TeleBot, message: str) -> bool:
     """
     Отправляет сообщения в чат по TELEGRAM_CHAT_ID.
 
-    Аргументы:
-        bot (TeleBot): экземпляр класса TeleBot, телеграм-бот
-        message (str): сообщение пользователю
-
-    Если сообщение не отправилось — лог ERROR. Ловит ошибки со стороны телеграм
-    и ошибки запроса.
-
-    Возвращает:
-        bool: True в случае успешной отправки, иначе False
+    :param bot: Экземпляр Telegram-бота.
+    :param message: Текст сообщения.
+    :return: True, если сообщение отправлено успешно, иначе False.
     """
     logger.debug('Отправляем сообщение в Telegram: %s', message)
 
@@ -98,26 +93,23 @@ def send_message(bot: TeleBot, message: str) -> bool:
 
 def get_api_answer(timestamp: int) -> dict[str, Any]:
     """
-    Делает запрос к API Практикум Домашка.
+    Делает запрос к API.
 
-    Аргументы:
-        timestamp (int): временная метка
-
-    Возвращает:
-        dict[str, Any]: ответ API в виде словаря
+    :param timestamp: Временная метка последнего запроса.
+    :return: Ответ API в виде словаря.
+    :raises APIRequestError: Если запрос завершился ошибкой.
+    :raises APIResponseError: Если ответ API не удалось преобразовать в JSON.
     """
     request_params = {
         'url': ENDPOINT,
         'headers': HEADERS,
-        'params': {'from_date': timestamp}
+        'params': {'from_date': timestamp},
     }
 
     logger.debug(
-        'Отправляем запрос к API. '
-        'Адрес: %(url)s, '
-        'Заголовки: %(headers)s, '
-        'Параметры: %(params)s',
-        request_params
+        'Отправляем запрос к API. Адрес: %(url)s, '
+        'Заголовки: %(headers)s, Параметры: %(params)s',
+        request_params,
     )
 
     try:
@@ -142,11 +134,11 @@ def check_response(response: dict[str, Any]) -> list[dict[str, Any]]:
     """
     Проверяет ответ API на соответствие документации.
 
-    Аргументы:
-        response: dict[str, Any]
-
-    Возвращает:
-        homeworks (list[dict[str, Any]]): список домашек
+    :param response: Ответ API.
+    :return: Список домашних работ.
+    :raises TypeError: Если ответ API или список домашних работ
+        имеют некорректный тип.
+    :raises KeyError: Если в ответе API отсутствует ключ homeworks.
     """
     if not isinstance(response, dict):
         raise TypeError(f'Ожидался dict, получен {type(response)}')
@@ -169,13 +161,13 @@ def check_response(response: dict[str, Any]) -> list[dict[str, Any]]:
 
 def parse_status(homework: dict[str, Any]) -> str:
     """
-    Извлекает из информации о конкретной домашней работе статус этой работы.
+    Формирует сообщение о статусе домашней работы.
 
-    Аргументы:
-        homework (dict[str, Any]): один элемент из списка домашних работ
-
-    Возвращает:
-        str: статус домашней работы.
+    :param homework: Данные одной домашней работы.
+    :return: Сообщение о статусе домашней работы.
+    :raises TypeError: Если данные домашней работы имеют некорректный тип.
+    :raises KeyError: Если в данных домашней работы отсутствуют нужные ключи.
+    :raises InvalidHomeworkStatusError: Если статус домашней работы неизвестен.
     """
     if not isinstance(homework, dict):
         raise TypeError(f'Ожидался dict, получен {type(homework)}')
@@ -187,16 +179,19 @@ def parse_status(homework: dict[str, Any]) -> str:
     status = homework['status']
 
     if status not in HOMEWORK_VERDICTS:
-        raise InvalidHomeworkStatusError(f'Статус {status} не предусмотрен!')
+        raise InvalidHomeworkStatusError(
+            f'Статус {status} не предусмотрен!'
+        )
 
     homework_name = homework['homework_name']
     verdict = HOMEWORK_VERDICTS[status]
+
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
-def main():
+def main() -> None:
     """
-    Основная логика работы бота.
+    Запускает основной цикл работы бота.
 
     1. Получить response
     2. Проверить response
@@ -210,7 +205,6 @@ def main():
 
     bot = TeleBot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
-
     last_error_type = None
 
     while True:
